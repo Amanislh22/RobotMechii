@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RobotMechi Path Drawer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .sidebar {
+            background-color: #F9FAFB;
+            border-right: 1px solid #E5E7EB;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3B82F6;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+            display: none;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .canvas-container {
+            position: relative;
+            overflow: auto;
+            aspect-ratio: 1 / 1;
+            height: 100%;
+        }
+        .annotated-image-container {
+            aspect-ratio: 1 / 1;
+            height: 100%;
+            overflow: auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .path-display {
+            display: flex;
+            gap: 20px;
+            flex: 1;
+        }
+        .blueprint-bg {
+            background-image: linear-gradient(to right, #E5E7EB 1px, transparent 1px),
+                              linear-gradient(to bottom, #E5E7EB 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .commands-output {
+            height: 200px;
+            
+
+        }
+    </style>
+</head>
+<body class="flex flex-col h-full">
+    <div class="flex flex-1 h-full">
+        <!-- Sidebar -->
+        <div class="sidebar w-72 p-6 flex flex-col space-y-4">
+            <h1 class="text-2xl font-bold text-gray-800">RobotMechi</h1>
+            <p class="text-sm text-gray-600">Draw a path for the robot. It starts at the blue dot, facing up.</p>
+
+            <!-- Color Picker -->
+            <div>
+                <label for="colorPicker" class="block text-sm font-medium text-gray-700">Drawing Color</label>
+                <input type="color" id="colorPicker" value="#000000" class="w-full h-10 rounded cursor-pointer">
+            </div>
+
+            <!-- Brush Size Slider -->
+            <div>
+                <label for="brushSize" class="block text-sm font-medium text-gray-700">Brush Size: <span id="brushSizeValue">5</span>px</label>
+                <input type="range" id="brushSize" min="2" max="20" value="5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+
+            <!-- Background Selector -->
+            <div>
+                <label for="backgroundSelect" class="block text-sm font-medium text-gray-700">Canvas Background</label>
+                <select id="backgroundSelect" class="w-full p-2 border rounded">
+                    <option value="white">White</option>
+                    <option value="lightgray">Light Gray</option>
+                    <option value="blueprint">Blueprint</option>
+                </select>
+            </div>
+
+            <!-- Zoom Controls -->
+            <div class="flex space-x-2">
+                <button id="zoomInBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600">+</button>
+                <button id="zoomOutBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600">-</button>
+                <button id="zoomResetBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600">Reset</button>
+            </div>
+
+            <!-- Buttons -->
+            <button id="toggleGridBtn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Show Grid</button>
+            <button id="snapToGridBtn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Enable Snap to Grid</button>
+            <button id="undoBtn" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">Undo</button>
+            <button id="redoBtn" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">Redo</button>
+            <button id="previewPathBtn" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">Preview Path</button>
+            <button id="clearBtn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Clear Canvas</button>
+            <button id="downloadBtn" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">Download Drawing</button>
+            <button id="submitBtn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center">
+                <span>Generate Commands</span>
+                <div id="loadingSpinner" class="spinner ml-2"></div>
+            </button>
+        </div>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex flex-col p-6">
+            <div class="path-display">
+                <div class="canvas-container">
+                    <canvas id="drawingCanvas" class="bg-white border-2 border-gray-600" style="width: 100%; height: 100%;"></canvas>
+                </div>
+                <div class="annotated-image-container">
+                    <img id="annotatedImage" class="max-w-full max-h-full" alt="Annotated Path" style="display: none;">
+                </div>
+                <!-- Commands Output -->
+            <div class="commands-output">
+                <div id="commandsOutput"></div>
+            </div>
+            </div>
+
+            
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('drawingCanvas');
+        const ctx = canvas.getContext('2d');
+        const colorPicker = document.getElementById('colorPicker');
+        const brushSizeInput = document.getElementById('brushSize');
+        const brushSizeValue = document.getElementById('brushSizeValue');
+        const backgroundSelect = document.getElementById('backgroundSelect');
+        const zoomInBtn = document.getElementById('zoomInBtn');
+        const zoomOutBtn = document.getElementById('zoomOutBtn');
+        const zoomResetBtn = document.getElementById('zoomResetBtn');
+        const toggleGridBtn = document.getElementById('toggleGridBtn');
+        const snapToGridBtn = document.getElementById('snapToGridBtn');
+        const undoBtn = document.getElementById('undoBtn');
+        const redoBtn = document.getElementById('redoBtn');
+        const previewPathBtn = document.getElementById('previewPathBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        const submitBtn = document.getElementById('submitBtn');
+        const commandsOutput = document.getElementById('commandsOutput');
+        const annotatedImage = document.getElementById('annotatedImage');
+        const loadingSpinner = document.getElementById('loadingSpinner');
+
+        let drawing = false;
+        let showGrid = false;
+        let snapToGrid = false;
+        let showPathPreview = false;
+        let brushSize = 5;
+        let zoomLevel = 1;
+        let panX = 0;
+        let panY = 0;
+        let backgroundStyle = 'white';
+        let undoStack = [];
+        let redoStack = [];
+        let lastPoint = null;
+        let pathPoints = [];
+        let gridSize = 60;
+        let scaleFactor = 0.01;
+        let drawingBounds = {
+            minX: Infinity,
+            maxX: -Infinity,
+            minY: Infinity,
+            maxY: -Infinity
+        };
+
+        function saveCanvasState() {
+            undoStack.push(canvas.toDataURL());
+            redoStack = [];
+            updateUndoRedoButtons();
+        }
+
+        function updateUndoRedoButtons() {
+            undoBtn.disabled = undoStack.length === 0;
+            redoBtn.disabled = redoStack.length === 0;
+        }
+
+        function resizeCanvas() {
+            const canvasContainer = document.querySelector('.canvas-container');
+            const size = canvasContainer.clientHeight;
+            canvas.width = size;
+            canvas.height = size;
+
+            gridSize = Math.round(size / Math.floor(size / 60));
+            scaleFactor = 100 / size;
+
+            initializeCanvas();
+        }
+
+        function initializeCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (backgroundStyle === 'white') {
+                ctx.fillStyle = 'white';
+                canvas.classList.remove('blueprint-bg');
+            } else if (backgroundStyle === 'lightgray') {
+                ctx.fillStyle = '#F3F4F6';
+                canvas.classList.remove('blueprint-bg');
+            } else if (backgroundStyle === 'blueprint') {
+                ctx.fillStyle = '#E5E7EB';
+                canvas.classList.add('blueprint-bg');
+            }
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            if (showGrid) {
+                ctx.strokeStyle = '#D1D5DB';
+                ctx.lineWidth = 1;
+                for (let x = 0; x <= canvas.width; x += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, 0);
+                    ctx.lineTo(x, canvas.height);
+                    ctx.stroke();
+                }
+                for (let y = 0; y <= canvas.height; y += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+            }
+
+            ctx.fillStyle = 'blue';
+            ctx.beginPath();
+            ctx.arc(50, 50, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.strokeStyle = 'blue';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(50, 50);
+            ctx.lineTo(50, 30);
+            ctx.moveTo(50, 30);
+            ctx.lineTo(45, 35);
+            ctx.moveTo(50, 30);
+            ctx.lineTo(55, 35);
+            ctx.stroke();
+
+            ctx.strokeStyle = colorPicker.value;
+            ctx.lineWidth = brushSize;
+            ctx.lineCap = 'round';
+
+            pathPoints = [];
+            showPathPreview = false;
+            previewPathBtn.textContent = 'Preview Path';
+        }
+
+        brushSizeInput.addEventListener('input', () => {
+            brushSize = parseInt(brushSizeInput.value);
+            brushSizeValue.textContent = brushSize;
+            ctx.lineWidth = brushSize;
+        });
+
+        colorPicker.addEventListener('input', () => {
+            ctx.strokeStyle = colorPicker.value;
+        });
+
+        backgroundSelect.addEventListener('change', () => {
+            backgroundStyle = backgroundSelect.value;
+            initializeCanvas();
+        });
+
+        zoomInBtn.addEventListener('click', () => {
+            zoomLevel = Math.min(zoomLevel + 0.2, 3);
+            updateCanvasTransform();
+        });
+
+        zoomOutBtn.addEventListener('click', () => {
+            zoomLevel = Math.max(zoomLevel - 0.2, 0.5);
+            updateCanvasTransform();
+        });
+
+        zoomResetBtn.addEventListener('click', () => {
+            zoomLevel = 1;
+            panX = 0;
+            panY = 0;
+            updateCanvasTransform();
+        });
+
+        function updateCanvasTransform() {
+            canvas.style.transform = `scale(${zoomLevel}) translate(${panX}px, ${panY}px)`;
+        }
+
+        toggleGridBtn.addEventListener('click', () => {
+            showGrid = !showGrid;
+            toggleGridBtn.textContent = showGrid ? 'Hide Grid' : 'Show Grid';
+            initializeCanvas();
+        });
+
+        snapToGridBtn.addEventListener('click', () => {
+            snapToGrid = !snapToGrid;
+            snapToGridBtn.textContent = snapToGrid ? 'Disable Snap to Grid' : 'Enable Snap to Grid';
+        });
+
+        undoBtn.addEventListener('click', () => {
+            if (undoStack.length === 0) return;
+            redoStack.push(canvas.toDataURL());
+            const state = undoStack.pop();
+            const img = new Image();
+            img.src = state;
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+            };
+            updateUndoRedoButtons();
+            pathPoints = [];
+            showPathPreview = false;
+            previewPathBtn.textContent = 'Preview Path';
+        });
+
+        redoBtn.addEventListener('click', () => {
+            if (redoStack.length === 0) return;
+            undoStack.push(canvas.toDataURL());
+            const state = redoStack.pop();
+            const img = new Image();
+            img.src = state;
+            img.onload = () => {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+            };
+            updateUndoRedoButtons();
+            pathPoints = [];
+            showPathPreview = false;
+            previewPathBtn.textContent = 'Preview Path';
+        });
+
+        previewPathBtn.addEventListener('click', () => {
+            showPathPreview = !showPathPreview;
+            previewPathBtn.textContent = showPathPreview ? 'Hide Path Preview' : 'Preview Path';
+
+            if (showPathPreview) {
+                canvas.toBlob(async (blob) => {
+                    const img = new Image();
+                    img.src = URL.createObjectURL(blob);
+                    img.onload = () => {
+                        const tempCanvas = document.createElement('canvas');
+                        tempCanvas.width = canvas.width;
+                        tempCanvas.height = canvas.height;
+                        const tempCtx = tempCanvas.getContext('2d');
+                        tempCtx.drawImage(img, 0, 0);
+
+                        const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+                        const data = imageData.data;
+                        for (let i = 0; i < data.length; i += 4) {
+                            const r = data[i];
+                            const g = data[i + 1];
+                            const b = data[i + 2];
+                            const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
+                            data[i] = gray;
+                            data[i + 1] = gray;
+                            data[i + 2] = gray;
+                        }
+                        tempCtx.putImageData(imageData, 0, 0);
+
+                        const grayData = tempCtx.getImageData(0, 0, canvas.width, canvas.height).data;
+                        const points = [];
+                        const threshold = 150;
+                        const gridColor = { r: 209, g: 213, b: 219 };
+
+                        const padding = 20;
+                        const minX = Math.max(0, Math.floor(drawingBounds.minX - padding));
+                        const maxX = Math.min(canvas.width, Math.ceil(drawingBounds.maxX + padding));
+                        const minY = Math.max(0, Math.floor(drawingBounds.minY - padding));
+                        const maxY = Math.min(canvas.height, Math.ceil(drawingBounds.maxY + padding));
+
+                        for (let y = minY; y < maxY; y += 5) {
+                            for (let x = minX; x < maxX; x += 5) {
+                                const idx = (y * canvas.width + x) * 4;
+                                const r = grayData[idx];
+                                const g = grayData[idx + 1];
+                                const b = grayData[idx + 2];
+                                if (Math.abs(r - gridColor.r) < 10 && Math.abs(g - gridColor.g) < 10 && Math.abs(b - gridColor.b) < 10) {
+                                    continue;
+                                }
+                                if (grayData[idx] < threshold) {
+                                    points.push([x, y]);
+                                }
+                            }
+                        }
+
+                        points.sort((a, b) => {
+                            const distA = Math.sqrt((a[0] - 50) ** 2 + (a[1] - 50) ** 2);
+                            const distB = Math.sqrt((b[0] - 50) ** 2 + (b[1] - 50) ** 2);
+                            return distA - distB;
+                        });
+
+                        const simplifyDistance = canvas.width * 0.05;
+                        const simplifiedPoints = [];
+                        if (points.length > 0) {
+                            simplifiedPoints.push(points[0]);
+                            for (let i = 1; i < points.length; i++) {
+                                const lastPoint = simplifiedPoints[simplifiedPoints.length - 1];
+                                const dist = Math.sqrt(
+                                    (points[i][0] - lastPoint[0]) ** 2 +
+                                    (points[i][1] - lastPoint[1]) ** 2
+                                );
+                                if (dist > simplifyDistance) {
+                                    simplifiedPoints.push(points[i]);
+                                }
+                            }
+                        }
+
+                        pathPoints = simplifiedPoints;
+
+                        initializeCanvas();
+                        if (pathPoints.length > 1) {
+                            ctx.strokeStyle = '#39FF14';
+                            ctx.lineWidth = canvas.width * 0.005;
+                            ctx.beginPath();
+                            ctx.moveTo(pathPoints[0][0], pathPoints[0][1]);
+                            for (let i = 1; i < pathPoints.length; i++) {
+                                ctx.lineTo(pathPoints[i][0], pathPoints[i][1]);
+                            }
+                            ctx.stroke();
+
+                            ctx.fillStyle = '#39FF14';
+                            for (const point of pathPoints) {
+                                ctx.beginPath();
+                                ctx.arc(point[0], point[1], canvas.width * 0.008, 0, Math.PI * 2);
+                                ctx.fill();
+                            }
+                        }
+                    };
+                }, 'image/png');
+            } else {
+                initializeCanvas();
+            }
+        });
+
+        function snapCoordinate(coord) {
+            if (!snapToGrid) return coord;
+            return Math.round(coord / gridSize) * gridSize;
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            drawing = true;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoomLevel - panX;
+            const y = (e.clientY - rect.top) / zoomLevel - panY;
+            const snappedX = snapCoordinate(x);
+            const snappedY = snapCoordinate(y);
+            ctx.beginPath();
+            ctx.moveTo(snappedX, snappedY);
+            lastPoint = [snappedX, snappedY];
+            drawingBounds.minX = Math.min(drawingBounds.minX, snappedX);
+            drawingBounds.maxX = Math.max(drawingBounds.maxX, snappedX);
+            drawingBounds.minY = Math.min(drawingBounds.minY, snappedY);
+            drawingBounds.maxY = Math.max(drawingBounds.maxY, snappedY);
+            saveCanvasState();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!drawing) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) / zoomLevel - panX;
+            const y = (e.clientY - rect.top) / zoomLevel - panY;
+            const snappedX = snapCoordinate(x);
+            const snappedY = snapCoordinate(y);
+            if (lastPoint && (lastPoint[0] !== snappedX || lastPoint[1] !== snappedY)) {
+                ctx.lineTo(snappedX, snappedY);
+                ctx.stroke();
+                lastPoint = [snappedX, snappedY];
+                drawingBounds.minX = Math.min(drawingBounds.minX, snappedX);
+                drawingBounds.maxX = Math.max(drawingBounds.maxX, snappedX);
+                drawingBounds.minY = Math.min(drawingBounds.minY, snappedY);
+                drawingBounds.maxY = Math.max(drawingBounds.maxY, snappedY);
+            }
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            drawing = false;
+            ctx.closePath();
+            lastPoint = null;
+            pathPoints = [];
+            showPathPreview = false;
+            previewPathBtn.textContent = 'Preview Path';
+        });
+
+        canvas.addEventListener('mouseout', () => {
+            drawing = false;
+            ctx.closePath();
+            lastPoint = null;
+            pathPoints = [];
+            showPathPreview = false;
+            previewPathBtn.textContent = 'Preview Path';
+        });
+
+        clearBtn.addEventListener('click', () => {
+            initializeCanvas();
+            undoStack = [];
+            redoStack = [];
+            updateUndoRedoButtons();
+            commandsOutput.innerHTML = '';
+            annotatedImage.style.display = 'none';
+            annotatedImage.src = '';
+            drawingBounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+        });
+
+        downloadBtn.addEventListener('click', () => {
+            const link = document.createElement('a');
+            link.download = 'robotmechi_path.png';
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        });
+
+        submitBtn.addEventListener('click', async () => {
+            loadingSpinner.style.display = 'block';
+            submitBtn.disabled = true;
+
+            canvas.toBlob(async (blob) => {
+                const img = new Image();
+                img.src = URL.createObjectURL(blob);
+                img.onload = async () => {
+                    const tempCanvas = document.createElement('canvas');
+                    tempCanvas.width = canvas.width;
+                    tempCanvas.height = canvas.height;
+                    const tempCtx = tempCanvas.getContext('2d');
+                    tempCtx.drawImage(img, 0, 0);
+
+                    const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i + 1];
+                        const b = data[i + 2];
+                        const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
+                        data[i] = gray;
+                        data[i + 1] = gray;
+                        data[i + 2] = gray;
+                    }
+                    tempCtx.putImageData(imageData, 0, 0);
+
+                    tempCanvas.toBlob(async (grayBlob) => {
+                        const formData = new FormData();
+                        formData.append('file', grayBlob, 'drawn_path.png');
+                        formData.append('scale_factor', scaleFactor);
+                        formData.append('start_x', 50);
+                        formData.append('start_y', 50);
+                        formData.append('orientation', 90);
+
+                        try {
+                            const response = await fetch('http://localhost:8000/generate-path-commands/', {
+                                method: 'POST',
+                                body: formData
+                            });
+
+                            const result = await response.json();
+                            loadingSpinner.style.display = 'none';
+                            submitBtn.disabled = false;
+
+                            if (response.ok) {
+                                commandsOutput.innerHTML = '<h3 class="font-bold text-gray-800 mb-2">Generated Commands:</h3>' +
+                                    '<ul class="list-disc pl-5">' + 
+                                    result.commands.map(cmd => `<li class="text-gray-700">${cmd}</li>`).join('') + 
+                                    '</ul>';
+
+                                annotatedImage.src = `http://localhost:8000/images/${result.annotated_image.split('/').pop()}`;
+                                annotatedImage.style.display = 'block';
+                            } else {
+                                commandsOutput.innerHTML = `<p class="text-red-500">Error: ${result.detail}</p>`;
+                                annotatedImage.style.display = 'none';
+                            }
+                        } catch (error) {
+                            loadingSpinner.style.display = 'none';
+                            submitBtn.disabled = false;
+                            commandsOutput.innerHTML = `<p class="text-red-500">Error: Failed to connect to the server</p>`;
+                            annotatedImage.style.display = 'none';
+                        }
+                    }, 'image/png');
+                };
+            }, 'image/png');
+        });
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+    </script>
+</body>
+</html>
