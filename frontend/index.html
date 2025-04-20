@@ -5,16 +5,43 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>RobotMechi Path Drawer</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         html, body {
             margin: 0;
             padding: 0;
             height: 100vh;
             overflow: hidden;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .dark body {
+            background-color: #1F2937;
+            color: #F9FAFB;
+        }
+        .navbar {
+            background: linear-gradient(to right, #3B82F6, #60A5FA);
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        .dark .navbar {
+            background: linear-gradient(to right, #1E3A8A, #3B82F6);
         }
         .sidebar {
             background-color: #F9FAFB;
             border-right: 1px solid #E5E7EB;
+            transition: transform 0.3s ease-in-out;
+            overflow-y: auto;
+            max-height: 90vh;
+        }
+        .dark .sidebar {
+            background-color: #374151;
+            border-right: 1px solid #4B5563;
+        }
+        .sidebar-hidden {
+            transform: translateX(-100%);
         }
         .spinner {
             border: 4px solid #f3f3f3;
@@ -53,36 +80,336 @@
                               linear-gradient(to bottom, #E5E7EB 1px, transparent 1px);
             background-size: 20px 20px;
         }
+        .dark .blueprint-bg {
+            background-image: linear-gradient(to right, #4B5563 1px, transparent 1px),
+                              linear-gradient(to bottom, #4B5563 1px, transparent 1px);
+        }
         .commands-output {
             height: 200px;
-            
-
+            overflow-y: auto;
+            background-color: #fff;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 10px;
+            margin-top: 20px;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .dark .commands-output {
+            background-color: #374151;
+            border-color: #4B5563;
+        }
+        .start-label {
+            position: absolute;
+            left: 30px;
+            top: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+        }
+        .path-length {
+            position: absolute;
+            bottom: 40px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+        }
+        .toolbar {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #fff;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 5px;
+            display: flex;
+            gap: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .dark .toolbar {
+            background-color: #374151;
+            border-color: #4B5563;
+        }
+        .toolbar button {
+            background: none;
+            border: none;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .toolbar button:hover {
+            background-color: #E5E7EB;
+        }
+        .dark .toolbar button:hover {
+            background-color: #4B5563;
+        }
+        .toolbar button.active {
+            background-color: #3B82F6;
+            color: #fff;
+        }
+        .toolbar button.flash {
+            animation: flash 0.3s;
+        }
+        @keyframes flash {
+            0% { background-color: #3B82F6; }
+            100% { background-color: transparent; }
+        }
+        .history-panel {
+            position: absolute;
+            right: 10px;
+            top: 10px;
+            width: 250px;
+            background-color: #fff;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 10px;
+            max-height: 400px;
+            overflow-y: auto;
+            display: none;
+            transition: background-color 0.3s, border-color 0.3s;
+        }
+        .dark .history-panel {
+            background-color: #374151;
+            border-color: #4B5563;
+        }
+        .history-panel ul {
+            list-style: none;
+            padding: 0;
+        }
+        .history-panel li {
+            padding: 5px;
+            cursor: pointer;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .history-panel li:hover {
+            background-color: #E5E7EB;
+        }
+        .dark .history-panel li:hover {
+            background-color: #4B5563;
+        }
+        .history-panel li.active {
+            background-color: #3B82F6;
+            color: #fff;
+        }
+        .history-panel img {
+            width: 30px;
+            height: 30px;
+            border-radius: 4px;
+        }
+        .history-panel button {
+            background: none;
+            border: none;
+            color: #EF4444;
+            cursor: pointer;
+        }
+        .status-bar {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #fff;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #10B981;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .toast.show {
+            opacity: 1;
+        }
+        .modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #fff;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+        .modal.show {
+            display: block;
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1);
+        }
+        .dark .modal {
+            background-color: #374151;
+        }
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            display: none;
+        }
+        .modal-overlay.show {
+            display: block;
+        }
+        .progress-bar-container {
+            position: absolute;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50%;
+            height: 10px;
+            background-color: #E5E7EB;
+            border-radius: 5px;
+            overflow: hidden;
+            display: none;
+        }
+        .dark .progress-bar-container {
+            background-color: #4B5563;
+        }
+        .progress-bar {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(to right, #3B82F6, #60A5FA);
+            transition: width 0.1s;
+        }
+        .preview-controls {
+            position: absolute;
+            top: 50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #fff;
+            border: 1px solid #E5E7EB;
+            border-radius: 8px;
+            padding: 5px;
+            display: flex;
+            gap: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        .dark .preview-controls {
+            background-color: #374151;
+            border-color: #4B5563;
+        }
+        .preview-controls button {
+            background: none;
+            border: none;
+            padding: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .preview-controls button:hover {
+            background-color: #E5E7EB;
+        }
+        .dark .preview-controls button:hover {
+            background-color: #4B5563;
+        }
+        .glow {
+            filter: url(#glow);
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 60%;
+            }
+            .path-display {
+                flex-direction: column;
+            }
+            .canvas-container, .annotated-image-container {
+                height: 50%;
+            }
+            .progress-bar-container {
+                width: 80%;
+            }
         }
     </style>
 </head>
 <body class="flex flex-col h-full">
-    <div class="flex flex-1 h-full">
+    <!-- SVG Filter for Glow Effect -->
+    <svg style="position: absolute; width: 0; height: 0;">
+        <defs>
+            <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur"/>
+                <feMerge>
+                    <feMergeNode in="blur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
+        </defs>
+    </svg>
+
+    <!-- Navbar -->
+    <div class="navbar">
+        <div class="flex items-center gap-2">
+            <h1 class="text-xl font-bold text-white">RobotMechi</h1>
+        </div>
+        <div class="flex gap-2">
+            <button id="saveBtn" class="px-3 py-1 bg-white text-blue-600 rounded hover:bg-gray-100" title="Save Project (Ctrl S)" aria-label="Save Project">
+                <i class="fas fa-save"></i>
+            </button>
+            <button id="loadBtn" class="px-3 py-1 bg-white text-blue-600 rounded hover:bg-gray-100" title="Load Project (Ctrl L)" aria-label="Load Project">
+                <i class="fas fa-upload"></i>
+            </button>
+            <button id="themeToggleBtn" class="px-3 py-1 bg-white text-blue-600 rounded hover:bg-gray-100" title="Toggle Theme (T)" aria-label="Toggle Theme">
+                <i class="fas fa-sun"></i>
+            </button>
+        </div>
+    </div>
+
+    <div class="flex flex-1 h-full relative">
         <!-- Sidebar -->
         <div class="sidebar w-72 p-6 flex flex-col space-y-4">
-            <h1 class="text-2xl font-bold text-gray-800">RobotMechi</h1>
-            <p class="text-sm text-gray-600">Draw a path for the robot. It starts at the blue dot, facing up.</p>
+            <p class="text-sm text-gray-600 dark:text-gray-400">Draw a path for the robot. It starts at the blue dot, facing up.</p>
 
             <!-- Color Picker -->
             <div>
-                <label for="colorPicker" class="block text-sm font-medium text-gray-700">Drawing Color</label>
+                <label for="colorPicker" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Drawing Color</label>
                 <input type="color" id="colorPicker" value="#000000" class="w-full h-10 rounded cursor-pointer">
+            </div>
+            <div class="flex gap-2">
+                <button class="w-8 h-8 rounded-full bg-red-500" onclick="document.getElementById('colorPicker').value='#EF4444'; document.getElementById('colorPicker').dispatchEvent(new Event('input'));" title="Red" aria-label="Select Red Color"></button>
+                <button class="w-8 h-8 rounded-full bg-green-500" onclick="document.getElementById('colorPicker').value='#10B981'; document.getElementById('colorPicker').dispatchEvent(new Event('input'));" title="Green" aria-label="Select Green Color"></button>
+                <button class="w-8 h-8 rounded-full bg-blue-500" onclick="document.getElementById('colorPicker').value='#3B82F6'; document.getElementById('colorPicker').dispatchEvent(new Event('input'));" title="Blue" aria-label="Select Blue Color"></button>
             </div>
 
             <!-- Brush Size Slider -->
             <div>
-                <label for="brushSize" class="block text-sm font-medium text-gray-700">Brush Size: <span id="brushSizeValue">5</span>px</label>
+                <label for="brushSize" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Brush Size: <span id="brushSizeValue">5</span>px</label>
                 <input type="range" id="brushSize" min="2" max="20" value="5" class="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer">
+            </div>
+            <div class="flex gap-2">
+                <button class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded" onclick="document.getElementById('brushSize').value=2; document.getElementById('brushSize').dispatchEvent(new Event('input'));" title="Small Brush (2px)" aria-label="Small Brush">S</button>
+                <button class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded" onclick="document.getElementById('brushSize').value=5; document.getElementById('brushSize').dispatchEvent(new Event('input'));" title="Medium Brush (5px)" aria-label="Medium Brush">M</button>
+                <button class="px-2 py-1 bg-gray-200 dark:bg-gray-700 rounded" onclick="document.getElementById('brushSize').value=10; document.getElementById('brushSize').dispatchEvent(new Event('input'));" title="Large Brush (10px)" aria-label="Large Brush">L</button>
             </div>
 
             <!-- Background Selector -->
             <div>
-                <label for="backgroundSelect" class="block text-sm font-medium text-gray-700">Canvas Background</label>
-                <select id="backgroundSelect" class="w-full p-2 border rounded">
+                <label for="backgroundSelect" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Canvas Background</label>
+                <select id="backgroundSelect" class="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600">
                     <option value="white">White</option>
                     <option value="lightgray">Light Gray</option>
                     <option value="blueprint">Blueprint</option>
@@ -91,42 +418,127 @@
 
             <!-- Zoom Controls -->
             <div class="flex space-x-2">
-                <button id="zoomInBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600">+</button>
-                <button id="zoomOutBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600">-</button>
-                <button id="zoomResetBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600">Reset</button>
+                <button id="zoomInBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600" title="Zoom In (Ctrl +)" aria-label="Zoom In">
+                    <i class="fas fa-search-plus"></i>
+                </button>
+                <button id="zoomOutBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600" title="Zoom Out (Ctrl -)" aria-label="Zoom Out">
+                    <i class="fas fa-search-minus"></i>
+                </button>
+                <button id="zoomResetBtn" class="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600" title="Reset Zoom (Ctrl 0)" aria-label="Reset Zoom">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+
+            <!-- Preview Speed -->
+            <div>
+                <label for="previewSpeed" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Preview Speed</label>
+                <select id="previewSpeed" class="w-full p-2 border rounded bg-white dark:bg-gray-700 dark:text-gray-300 dark:border-gray-600">
+                    <option value="1">Slow (1x)</option>
+                    <option value="2" selected>Medium (2x)</option>
+                    <option value="4">Fast (4x)</option>
+                </select>
             </div>
 
             <!-- Buttons -->
-            <button id="toggleGridBtn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Show Grid</button>
-            <button id="snapToGridBtn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Enable Snap to Grid</button>
-            <button id="undoBtn" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">Undo</button>
-            <button id="redoBtn" class="px-4 py-2 bg-yellow-500 text-white rounded hover:bg-yellow-600">Redo</button>
-            <button id="previewPathBtn" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">Preview Path</button>
-            <button id="clearBtn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600">Clear Canvas</button>
-            <button id="downloadBtn" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600">Download Drawing</button>
-            <button id="submitBtn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center">
+            <button id="toggleGridBtn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" title="Toggle Grid (G)" aria-label="Toggle Grid">
+                Show Grid
+            </button>
+            <button id="snapToGridBtn" class="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600" title="Toggle Snap to Grid (S)" aria-label="Toggle Snap to Grid">
+                Enable Snap to Grid
+            </button>
+            <button id="historyBtn" class="px-4 py-2 bg-indigo-500 text-white rounded hover:bg-indigo-600" title="View History (H)" aria-label="View History">
+                View History
+            </button>
+            <button id="previewPathBtn" class="px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600" title="Preview Path (P)" aria-label="Preview Path">
+                Preview Path
+            </button>
+            <button id="pathStatsBtn" class="px-4 py-2 bg-teal-500 text-white rounded hover:bg-teal-600" title="Path Statistics (Shift P)" aria-label="Path Statistics">
+                Path Statistics
+            </button>
+            <button id="clearBtn" class="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600" title="Clear Canvas (C)" aria-label="Clear Canvas">
+                Clear Canvas
+            </button>
+            <div class="flex space-x-2">
+                <button id="downloadPngBtn" class="flex-1 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600" title="Download as PNG (D)" aria-label="Download as PNG">
+                    <i class="fas fa-download"></i> PNG
+                </button>
+                <button id="downloadSvgBtn" class="flex-1 px-4 py-2 bg-purple-500 text-white rounded hover:bg-purple-600" title="Download as SVG (Shift D)" aria-label="Download as SVG">
+                    <i class="fas fa-download"></i> SVG
+                </button>
+            </div>
+            <button id="submitBtn" class="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600 flex items-center justify-center" title="Generate Commands (Enter)" aria-label="Generate Commands">
                 <span>Generate Commands</span>
                 <div id="loadingSpinner" class="spinner ml-2"></div>
             </button>
         </div>
 
         <!-- Main Content -->
-        <div class="flex-1 flex flex-col p-6">
+        <div class="flex-1 flex flex-col p-6 relative">
+            <button id="toggleSidebarBtn" class="absolute top-4 left-4 text-gray-600 dark:text-gray-300" title="Toggle Sidebar (Shift S)" aria-label="Toggle Sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
             <div class="path-display">
                 <div class="canvas-container">
-                    <canvas id="drawingCanvas" class="bg-white border-2 border-gray-600" style="width: 100%; height: 100%;"></canvas>
+                    <div class="toolbar">
+                        <button id="drawToolBtn" class="active" title="Draw Tool (1)" aria-label="Draw Tool">
+                            <i class="fas fa-pencil-alt"></i>
+                        </button>
+                        <button id="eraseToolBtn" title="Erase Tool (2)" aria-label="Erase Tool">
+                            <i class="fas fa-eraser"></i>
+                        </button>
+                        <button id="selectToolBtn" title="Select Tool (3)" aria-label="Select Tool">
+                            <i class="fas fa-mouse-pointer"></i>
+                        </button>
+                        <button id="undoBtn" title="Undo (Ctrl Z)" aria-label="Undo">
+                            <i class="fas fa-undo-alt"></i>
+                        </button>
+                        <button id="redoBtn" title="Redo (Ctrl Y)" aria-label="Redo">
+                            <i class="fas fa-redo-alt"></i>
+                        </button>
+                    </div>
+                    <div id="previewControls" class="preview-controls">
+                        <button id="pauseResumeBtn" title="Pause/Resume Preview (Space)" aria-label="Pause/Resume Preview">
+                            <i class="fas fa-pause"></i>
+                        </button>
+                        <button id="replayBtn" title="Replay Preview (R)" aria-label="Replay Preview">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+                    <canvas id="drawingCanvas" class="bg-white border-2 border-gray-600 dark:border-gray-500" style="width: 100%; height: 100%;" tabindex="0"></canvas>
+                    <div id="start-label" class="start-label">Start (50, 50), facing up</div>
+                    <div id="path-length" class="path-length"></div>
+                    <div id="statusBar" class="status-bar"></div>
+                    <div id="progressBarContainer" class="progress-bar-container">
+                        <div id="progressBar" class="progress-bar"></div>
+                    </div>
                 </div>
                 <div class="annotated-image-container">
                     <img id="annotatedImage" class="max-w-full max-h-full" alt="Annotated Path" style="display: none;">
                 </div>
-                <!-- Commands Output -->
+            </div>
+
+            <!-- Commands Output -->
             <div class="commands-output">
                 <div id="commandsOutput"></div>
             </div>
-            </div>
 
-            
+            <!-- History Panel -->
+            <div id="historyPanel" class="history-panel">
+                <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300">Action History</h3>
+                <ul id="historyList"></ul>
+            </div>
         </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast"></div>
+
+    <!-- Path Statistics Modal -->
+    <div id="modalOverlay" class="modal-overlay"></div>
+    <div id="pathStatsModal" class="modal">
+        <h2 class="text-lg font-bold text-gray-800 dark:text-gray-100 mb-4">Path Statistics</h2>
+        <div id="pathStatsContent" class="text-gray-700 dark:text-gray-300"></div>
+        <button id="closeModalBtn" class="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600">Close</button>
     </div>
 
     <script>
@@ -136,6 +548,7 @@
         const brushSizeInput = document.getElementById('brushSize');
         const brushSizeValue = document.getElementById('brushSizeValue');
         const backgroundSelect = document.getElementById('backgroundSelect');
+        const previewSpeed = document.getElementById('previewSpeed');
         const zoomInBtn = document.getElementById('zoomInBtn');
         const zoomOutBtn = document.getElementById('zoomOutBtn');
         const zoomResetBtn = document.getElementById('zoomResetBtn');
@@ -143,45 +556,156 @@
         const snapToGridBtn = document.getElementById('snapToGridBtn');
         const undoBtn = document.getElementById('undoBtn');
         const redoBtn = document.getElementById('redoBtn');
+        const historyBtn = document.getElementById('historyBtn');
         const previewPathBtn = document.getElementById('previewPathBtn');
+        const pathStatsBtn = document.getElementById('pathStatsBtn');
         const clearBtn = document.getElementById('clearBtn');
-        const downloadBtn = document.getElementById('downloadBtn');
+        const downloadPngBtn = document.getElementById('downloadPngBtn');
+        const downloadSvgBtn = document.getElementById('downloadSvgBtn');
         const submitBtn = document.getElementById('submitBtn');
+        const saveBtn = document.getElementById('saveBtn');
+        const loadBtn = document.getElementById('loadBtn');
         const commandsOutput = document.getElementById('commandsOutput');
         const annotatedImage = document.getElementById('annotatedImage');
         const loadingSpinner = document.getElementById('loadingSpinner');
+        const pathLengthDisplay = document.getElementById('path-length');
+        const themeToggleBtn = document.getElementById('themeToggleBtn');
+        const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
+        const drawToolBtn = document.getElementById('drawToolBtn');
+        const eraseToolBtn = document.getElementById('eraseToolBtn');
+        const selectToolBtn = document.getElementById('selectToolBtn');
+        const historyPanel = document.getElementById('historyPanel');
+        const historyList = document.getElementById('historyList');
+        const statusBar = document.getElementById('statusBar');
+        const toast = document.getElementById('toast');
+        const previewControls = document.getElementById('previewControls');
+        const pauseResumeBtn = document.getElementById('pauseResumeBtn');
+        const replayBtn = document.getElementById('replayBtn');
+        const progressBarContainer = document.getElementById('progressBarContainer');
+        const progressBar = document.getElementById('progressBar');
+        const pathStatsModal = document.getElementById('pathStatsModal');
+        const modalOverlay = document.getElementById('modalOverlay');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const pathStatsContent = document.getElementById('pathStatsContent');
 
         let drawing = false;
+        let erasing = false;
+        let selecting = false;
+        let panning = false;
         let showGrid = false;
         let snapToGrid = false;
         let showPathPreview = false;
+        let isPaused = false;
         let brushSize = 5;
         let zoomLevel = 1;
         let panX = 0;
         let panY = 0;
+        let startPanX = 0;
+        let startPanY = 0;
         let backgroundStyle = 'white';
         let undoStack = [];
         let redoStack = [];
         let lastPoint = null;
         let pathPoints = [];
+        let currentPath = [];
+        let paths = [];
+        let selectedPoint = null;
         let gridSize = 60;
-        let scaleFactor = 0.01;
+        let scaleFactor = 0.002;
         let drawingBounds = {
             minX: Infinity,
             maxX: -Infinity,
             minY: Infinity,
             maxY: -Infinity
         };
+        let currentTool = 'draw';
+        let cursorX = 0;
+        let cursorY = 0;
+        let animationFrameId = null;
 
-        function saveCanvasState() {
-            undoStack.push(canvas.toDataURL());
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        function showModal(content) {
+            pathStatsContent.innerHTML = content;
+            pathStatsModal.classList.add('show');
+            modalOverlay.classList.add('show');
+        }
+
+        function closeModal() {
+            pathStatsModal.classList.remove('show');
+            modalOverlay.classList.remove('show');
+        }
+
+        function saveCanvasState(action = 'Draw') {
+            const thumbnail = canvas.toDataURL('image/png', 0.1);
+            undoStack.push({ image: canvas.toDataURL(), paths: JSON.parse(JSON.stringify(paths)), action, thumbnail });
             redoStack = [];
             updateUndoRedoButtons();
+            updateHistoryPanel();
         }
 
         function updateUndoRedoButtons() {
-            undoBtn.disabled = undoStack.length === 0;
+            undoBtn.disabled = undoStack.length <= 1;
             redoBtn.disabled = redoStack.length === 0;
+        }
+
+        function updateHistoryPanel() {
+            historyList.innerHTML = '';
+            undoStack.forEach((state, index) => {
+                const li = document.createElement('li');
+                const img = document.createElement('img');
+                img.src = state.thumbnail;
+                img.alt = state.action;
+                const span = document.createElement('span');
+                span.textContent = state.action;
+                const deleteBtn = document.createElement('button');
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                deleteBtn.title = 'Delete Action';
+                deleteBtn.ariaLabel = 'Delete Action';
+                deleteBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    undoStack.splice(index, 1);
+                    if (undoStack.length === 0) {
+                        initializeCanvas();
+                        paths = [];
+                    } else {
+                        const img = new Image();
+                        img.src = undoStack[undoStack.length - 1].image;
+                        img.onload = () => {
+                            initializeCanvas();
+                            ctx.drawImage(img, 0, 0);
+                        };
+                        paths = JSON.parse(JSON.stringify(undoStack[undoStack.length - 1].paths));
+                    }
+                    updateUndoRedoButtons();
+                    updateHistoryPanel();
+                };
+                li.appendChild(img);
+                li.appendChild(span);
+                li.appendChild(deleteBtn);
+                li.className = index === undoStack.length - 1 ? 'active' : '';
+                li.addEventListener('click', () => {
+                    while (undoStack.length > index + 1) {
+                        redoStack.push(undoStack.pop());
+                    }
+                    const img = new Image();
+                    img.src = undoStack[undoStack.length - 1].image;
+                    img.onload = () => {
+                        initializeCanvas();
+                        ctx.drawImage(img, 0, 0);
+                    };
+                    paths = JSON.parse(JSON.stringify(undoStack[undoStack.length - 1].paths));
+                    updateUndoRedoButtons();
+                    updateHistoryPanel();
+                });
+                historyList.appendChild(li);
+            });
         }
 
         function resizeCanvas() {
@@ -191,12 +715,12 @@
             canvas.height = size;
 
             gridSize = Math.round(size / Math.floor(size / 60));
-            scaleFactor = 100 / size;
+            scaleFactor = 0.002;
 
             initializeCanvas();
         }
 
-        function initializeCanvas() {
+        function initializeCanvas(preservePaths = false) {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
 
             if (backgroundStyle === 'white') {
@@ -247,10 +771,134 @@
             ctx.strokeStyle = colorPicker.value;
             ctx.lineWidth = brushSize;
             ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
 
+            if (!preservePaths) {
+                pathPoints = [];
+                showPathPreview = false;
+                previewPathBtn.textContent = 'Preview Path';
+                previewControls.style.display = 'none';
+                progressBarContainer.style.display = 'none';
+                progressBar.style.width = '0%';
+            }
+
+            paths.forEach(path => {
+                ctx.beginPath();
+                ctx.strokeStyle = path.color;
+                ctx.lineWidth = path.size;
+                if (showPathPreview) {
+                    ctx.filter = 'url(#glow)';
+                    ctx.strokeStyle = '#39FF14';
+                }
+                path.points.forEach((point, index) => {
+                    if (index === 0) {
+                        ctx.moveTo(point.x, point.y);
+                    } else {
+                        ctx.lineTo(point.x, point.y);
+                    }
+                });
+                ctx.stroke();
+                ctx.filter = 'none';
+            });
+
+            if (selectedPoint) {
+                ctx.fillStyle = 'orange';
+                ctx.beginPath();
+                ctx.arc(selectedPoint.x, selectedPoint.y, 5, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            if (undoStack.length === 0 && !preservePaths) {
+                saveCanvasState('Initialize');
+            }
+        }
+
+        function calculatePathLength(points) {
+            let length = 0;
+            for (let i = 1; i < points.length; i++) {
+                const dx = points[i].x - points[i - 1].x;
+                const dy = points[i].y - points[i - 1].y;
+                length += Math.sqrt(dx * dx + dy * dy);
+            }
+            return (length * scaleFactor).toFixed(2);
+        }
+
+        function getPathStatistics() {
+            let totalDistance = 0;
+            let turns = 0;
+            let points = [];
+            paths.forEach(path => {
+                path.points.forEach(point => points.push(point));
+            });
+            points.sort((a, b) => {
+                const distA = Math.sqrt((a.x - 50) ** 2 + (a.y - 50) ** 2);
+                const distB = Math.sqrt((b.x - 50) ** 2 + (b.y - 50) ** 2);
+                return distA - distB;
+            });
+
+            const simplifyDistance = canvas.width * 0.05;
             pathPoints = [];
-            showPathPreview = false;
-            previewPathBtn.textContent = 'Preview Path';
+            if (points.length > 0) {
+                pathPoints.push(points[0]);
+                for (let i = 1; i < points.length; i++) {
+                    const lastPoint = pathPoints[pathPoints.length - 1];
+                    const dist = Math.sqrt(
+                        (points[i].x - lastPoint.x) ** 2 +
+                        (points[i].y - lastPoint.y) ** 2
+                    );
+                    if (dist > simplifyDistance) {
+                        pathPoints.push(points[i]);
+                    }
+                }
+            }
+
+            totalDistance = parseFloat(calculatePathLength(pathPoints));
+            for (let i = 2; i < pathPoints.length; i++) {
+                const p1 = pathPoints[i - 2];
+                const p2 = pathPoints[i - 1];
+                const p3 = pathPoints[i];
+                const angle1 = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+                const angle2 = Math.atan2(p3.y - p2.y, p3.x - p2.x);
+                const angleDiff = Math.abs(angle2 - angle1) * (180 / Math.PI);
+                if (angleDiff > 30) turns++;
+            }
+
+            const duration = totalDistance / (2 * parseFloat(previewSpeed.value));
+            const avgSpeed = totalDistance / duration;
+
+            return {
+                totalDistance,
+                turns,
+                points: pathPoints.length,
+                avgSpeed: avgSpeed.toFixed(2),
+                duration: duration.toFixed(2)
+            };
+        }
+
+        function getSVGContent() {
+            let svg = `<svg width="${canvas.width}" height="${canvas.height}" xmlns="http://www.w3.org/2000/svg">`;
+            svg += `<rect width="100%" height="100%" fill="${backgroundStyle === 'white' ? '#fff' : backgroundStyle === 'lightgray' ? '#F3F4F6' : '#E5E7EB'}"/>`;
+            if (showGrid) {
+                for (let x = 0; x <= canvas.width; x += gridSize) {
+                    svg += `<line x1="${x}" y1="0" x2="${x}" y2="${canvas.height}" stroke="#D1D5DB" stroke-width="1"/>`;
+                }
+                for (let y = 0; y <= canvas.height; y += gridSize) {
+                    svg += `<line x1="0" y1="${y}" x2="${canvas.width}" y2="${y}" stroke="#D1D5DB" stroke-width="1"/>`;
+                }
+            }
+            svg += `<circle cx="50" cy="50" r="5" fill="blue"/>`;
+            svg += `<path d="M50 50 L50 30 M50 30 L45 35 M50 30 L55 35" stroke="blue" stroke-width="2"/>`;
+            paths.forEach(path => {
+                if (path.points.length > 1) {
+                    let d = `M${path.points[0].x} ${path.points[0].y}`;
+                    for (let i = 1; i < path.points.length; i++) {
+                        d += ` L${path.points[i].x} ${path.points[i].y}`;
+                    }
+                    svg += `<path d="${d}" stroke="${path.color}" stroke-width="${path.size}" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`;
+                }
+            });
+            svg += '</svg>';
+            return svg;
         }
 
         brushSizeInput.addEventListener('input', () => {
@@ -266,16 +914,19 @@
         backgroundSelect.addEventListener('change', () => {
             backgroundStyle = backgroundSelect.value;
             initializeCanvas();
+            saveCanvasState('Change Background');
         });
 
         zoomInBtn.addEventListener('click', () => {
             zoomLevel = Math.min(zoomLevel + 0.2, 3);
             updateCanvasTransform();
+            updateStatusBar();
         });
 
         zoomOutBtn.addEventListener('click', () => {
             zoomLevel = Math.max(zoomLevel - 0.2, 0.5);
             updateCanvasTransform();
+            updateStatusBar();
         });
 
         zoomResetBtn.addEventListener('click', () => {
@@ -283,156 +934,229 @@
             panX = 0;
             panY = 0;
             updateCanvasTransform();
+            updateStatusBar();
         });
 
         function updateCanvasTransform() {
             canvas.style.transform = `scale(${zoomLevel}) translate(${panX}px, ${panY}px)`;
         }
 
+        function updateStatusBar() {
+            statusBar.textContent = `Cursor: (${cursorX.toFixed(0)}, ${cursorY.toFixed(0)}) | Zoom: ${(zoomLevel * 100).toFixed(0)}%`;
+        }
+
         toggleGridBtn.addEventListener('click', () => {
             showGrid = !showGrid;
             toggleGridBtn.textContent = showGrid ? 'Hide Grid' : 'Show Grid';
             initializeCanvas();
+            saveCanvasState('Toggle Grid');
         });
 
         snapToGridBtn.addEventListener('click', () => {
             snapToGrid = !snapToGrid;
             snapToGridBtn.textContent = snapToGrid ? 'Disable Snap to Grid' : 'Enable Snap to Grid';
+            showToast(snapToGrid ? 'Snap to Grid Enabled' : 'Snap to Grid Disabled');
         });
 
         undoBtn.addEventListener('click', () => {
-            if (undoStack.length === 0) return;
-            redoStack.push(canvas.toDataURL());
-            const state = undoStack.pop();
+            if (undoStack.length <= 1) return;
+            redoStack.push(undoStack.pop());
+            const state = undoStack[undoStack.length - 1];
             const img = new Image();
-            img.src = state;
+            img.src = state.image;
             img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                initializeCanvas();
                 ctx.drawImage(img, 0, 0);
             };
+            paths = JSON.parse(JSON.stringify(state.paths));
             updateUndoRedoButtons();
-            pathPoints = [];
-            showPathPreview = false;
-            previewPathBtn.textContent = 'Preview Path';
+            updateHistoryPanel();
+            undoBtn.classList.add('flash');
+            showToast('Undo');
         });
 
         redoBtn.addEventListener('click', () => {
             if (redoStack.length === 0) return;
-            undoStack.push(canvas.toDataURL());
             const state = redoStack.pop();
+            undoStack.push(state);
             const img = new Image();
-            img.src = state;
+            img.src = state.image;
             img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                initializeCanvas();
                 ctx.drawImage(img, 0, 0);
             };
+            paths = JSON.parse(JSON.stringify(state.paths));
             updateUndoRedoButtons();
-            pathPoints = [];
-            showPathPreview = false;
-            previewPathBtn.textContent = 'Preview Path';
+            updateHistoryPanel();
+            redoBtn.classList.add('flash');
+            showToast('Redo');
         });
 
+        historyBtn.addEventListener('click', () => {
+            historyPanel.style.display = historyPanel.style.display === 'block' ? 'none' : 'block';
+        });
+
+        pathStatsBtn.addEventListener('click', () => {
+            const stats = getPathStatistics();
+            const content = `
+                <p><strong>Total Distance:</strong> ${stats.totalDistance}m</p>
+                <p><strong>Number of Turns:</strong> ${stats.turns}</p>
+                <p><strong>Points:</strong> ${stats.points}</p>
+                <p><strong>Average Speed:</strong> ${stats.avgSpeed}m/s</p>
+                <p><strong>Duration:</strong> ${stats.duration}s</p>
+            `;
+            showModal(content);
+        });
+
+        closeModalBtn.addEventListener('click', closeModal);
+        modalOverlay.addEventListener('click', closeModal);
+
         previewPathBtn.addEventListener('click', () => {
-            showPathPreview = !showPathPreview;
-            previewPathBtn.textContent = showPathPreview ? 'Hide Path Preview' : 'Preview Path';
+    showPathPreview = !showPathPreview;
+    previewPathBtn.textContent = showPathPreview ? 'Hide Path Preview' : 'Preview Path';
 
-            if (showPathPreview) {
-                canvas.toBlob(async (blob) => {
-                    const img = new Image();
-                    img.src = URL.createObjectURL(blob);
-                    img.onload = () => {
-                        const tempCanvas = document.createElement('canvas');
-                        tempCanvas.width = canvas.width;
-                        tempCanvas.height = canvas.height;
-                        const tempCtx = tempCanvas.getContext('2d');
-                        tempCtx.drawImage(img, 0, 0);
+    if (showPathPreview) {
+        // Collect all points from the paths in the order they were drawn
+        let points = [];
+        paths.forEach(path => {
+            path.points.forEach(point => points.push(point));
+        });
 
-                        const imageData = tempCtx.getImageData(0, 0, canvas.width, canvas.height);
-                        const data = imageData.data;
-                        for (let i = 0; i < data.length; i += 4) {
-                            const r = data[i];
-                            const g = data[i + 1];
-                            const b = data[i + 2];
-                            const gray = 0.2989 * r + 0.5870 * g + 0.1140 * b;
-                            data[i] = gray;
-                            data[i + 1] = gray;
-                            data[i + 2] = gray;
-                        }
-                        tempCtx.putImageData(imageData, 0, 0);
-
-                        const grayData = tempCtx.getImageData(0, 0, canvas.width, canvas.height).data;
-                        const points = [];
-                        const threshold = 150;
-                        const gridColor = { r: 209, g: 213, b: 219 };
-
-                        const padding = 20;
-                        const minX = Math.max(0, Math.floor(drawingBounds.minX - padding));
-                        const maxX = Math.min(canvas.width, Math.ceil(drawingBounds.maxX + padding));
-                        const minY = Math.max(0, Math.floor(drawingBounds.minY - padding));
-                        const maxY = Math.min(canvas.height, Math.ceil(drawingBounds.maxY + padding));
-
-                        for (let y = minY; y < maxY; y += 5) {
-                            for (let x = minX; x < maxX; x += 5) {
-                                const idx = (y * canvas.width + x) * 4;
-                                const r = grayData[idx];
-                                const g = grayData[idx + 1];
-                                const b = grayData[idx + 2];
-                                if (Math.abs(r - gridColor.r) < 10 && Math.abs(g - gridColor.g) < 10 && Math.abs(b - gridColor.b) < 10) {
-                                    continue;
-                                }
-                                if (grayData[idx] < threshold) {
-                                    points.push([x, y]);
-                                }
-                            }
-                        }
-
-                        points.sort((a, b) => {
-                            const distA = Math.sqrt((a[0] - 50) ** 2 + (a[1] - 50) ** 2);
-                            const distB = Math.sqrt((b[0] - 50) ** 2 + (b[1] - 50) ** 2);
-                            return distA - distB;
-                        });
-
-                        const simplifyDistance = canvas.width * 0.05;
-                        const simplifiedPoints = [];
-                        if (points.length > 0) {
-                            simplifiedPoints.push(points[0]);
-                            for (let i = 1; i < points.length; i++) {
-                                const lastPoint = simplifiedPoints[simplifiedPoints.length - 1];
-                                const dist = Math.sqrt(
-                                    (points[i][0] - lastPoint[0]) ** 2 +
-                                    (points[i][1] - lastPoint[1]) ** 2
-                                );
-                                if (dist > simplifyDistance) {
-                                    simplifiedPoints.push(points[i]);
-                                }
-                            }
-                        }
-
-                        pathPoints = simplifiedPoints;
-
-                        initializeCanvas();
-                        if (pathPoints.length > 1) {
-                            ctx.strokeStyle = '#39FF14';
-                            ctx.lineWidth = canvas.width * 0.005;
-                            ctx.beginPath();
-                            ctx.moveTo(pathPoints[0][0], pathPoints[0][1]);
-                            for (let i = 1; i < pathPoints.length; i++) {
-                                ctx.lineTo(pathPoints[i][0], pathPoints[i][1]);
-                            }
-                            ctx.stroke();
-
-                            ctx.fillStyle = '#39FF14';
-                            for (const point of pathPoints) {
-                                ctx.beginPath();
-                                ctx.arc(point[0], point[1], canvas.width * 0.008, 0, Math.PI * 2);
-                                ctx.fill();
-                            }
-                        }
-                    };
-                }, 'image/png');
-            } else {
-                initializeCanvas();
+        // Remove consecutive duplicate points (where the mouse didn't move)
+        pathPoints = [];
+        if (points.length > 0) {
+            pathPoints.push(points[0]); // Always keep the first point
+            for (let i = 1; i < points.length; i++) {
+                const lastPoint = pathPoints[pathPoints.length - 1];
+                // Only add the point if it's different from the last one
+                if (points[i].x !== lastPoint.x || points[i].y !== lastPoint.y) {
+                    pathPoints.push(points[i]);
+                }
             }
+        }
+
+        if (pathPoints.length < 2) {
+            showToast('Draw a path to preview');
+            showPathPreview = false;
+            previewPathBtn.textContent = 'Preview Path';
+            return;
+        }
+
+        let currentPointIndex = 0;
+        let progress = 0;
+        let totalDistance = 0;
+        const distances = [];
+        for (let i = 1; i < pathPoints.length; i++) {
+            const dx = pathPoints[i].x - pathPoints[i - 1].x;
+            const dy = pathPoints[i].y - pathPoints[i - 1].y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            totalDistance += dist;
+            distances.push(dist);
+        }
+        const speed = parseFloat(previewSpeed.value);
+        isPaused = false;
+        pauseResumeBtn.innerHTML = '<i class="fas fa-pause"></i>';
+        previewControls.style.display = 'flex';
+        progressBarContainer.style.display = 'block';
+
+        function animate() {
+            if (!showPathPreview || currentPointIndex >= pathPoints.length - 1) {
+                cancelAnimationFrame(animationFrameId);
+                initializeCanvas();
+                previewControls.style.display = 'none';
+                progressBarContainer.style.display = 'none';
+                progressBar.style.width = '0%';
+                return;
+            }
+
+            if (isPaused) {
+                animationFrameId = requestAnimationFrame(animate);
+                return;
+            }
+
+            const start = pathPoints[currentPointIndex];
+            const end = pathPoints[currentPointIndex + 1];
+            const dx = end.x - start.x;
+            const dy = end.y - start.y;
+            const distance = distances[currentPointIndex];
+            const steps = distance / speed;
+            const stepX = dx / steps;
+            const stepY = dy / steps;
+
+            if (progress >= distance) {
+                currentPointIndex++;
+                progress = 0;
+                animationFrameId = requestAnimationFrame(animate);
+                return;
+            }
+
+            const x = start.x + (progress / distance) * dx;
+            const y = start.y + (progress / distance) * dy;
+
+            initializeCanvas(true);
+            if (pathPoints.length > 1) {
+                ctx.strokeStyle = '#39FF14';
+                ctx.lineWidth = canvas.width * 0.005;
+                ctx.beginPath();
+                ctx.moveTo(pathPoints[0].x, pathPoints[0].y);
+                for (let i = 1; i < pathPoints.length; i++) {
+                    ctx.lineTo(pathPoints[i].x, pathPoints[i].y);
+                }
+                ctx.stroke();
+
+                ctx.fillStyle = '#39FF14';
+                for (const point of pathPoints) {
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, canvas.width * 0.008, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.arc(x, y, 5, 0, Math.PI * 2);
+            ctx.fill();
+
+            const angle = Math.atan2(-dy, dx);
+            ctx.strokeStyle = 'red';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x + 15 * Math.cos(angle), y - 15 * Math.sin(angle));
+            ctx.stroke();
+
+            let traversedDistance = 0;
+            for (let i = 0; i < currentPointIndex; i++) {
+                traversedDistance += distances[i];
+            }
+            traversedDistance += progress;
+            const progressPercent = (traversedDistance / totalDistance) * 100;
+            progressBar.style.width = `${progressPercent}%`;
+
+            progress += speed;
+            animationFrameId = requestAnimationFrame(animate);
+        }
+
+        animationFrameId = requestAnimationFrame(animate);
+    } else {
+        cancelAnimationFrame(animationFrameId);
+        initializeCanvas();
+    }
+});
+
+        pauseResumeBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            pauseResumeBtn.innerHTML = isPaused ? '<i class="fas fa-play"></i>' : '<i class="fas fa-pause"></i>';
+            showToast(isPaused ? 'Preview Paused' : 'Preview Resumed');
+        });
+
+        replayBtn.addEventListener('click', () => {
+            showPathPreview = false;
+            previewPathBtn.textContent = 'Preview Path';
+            cancelAnimationFrame(animationFrameId);
+            initializeCanvas();
+            setTimeout(() => previewPathBtn.click(), 100);
+            showToast('Preview Replayed');
         });
 
         function snapCoordinate(coord) {
@@ -440,75 +1164,254 @@
             return Math.round(coord / gridSize) * gridSize;
         }
 
+        function getPointAt(x, y) {
+            for (const path of paths) {
+                for (const point of path.points) {
+                    const dx = point.x - x;
+                    const dy = point.y - y;
+                    if (Math.sqrt(dx * dx + dy * dy) < 10) {
+                        return point;
+                    }
+                }
+            }
+            return null;
+        }
+
         canvas.addEventListener('mousedown', (e) => {
-            drawing = true;
             const rect = canvas.getBoundingClientRect();
             const x = (e.clientX - rect.left) / zoomLevel - panX;
             const y = (e.clientY - rect.top) / zoomLevel - panY;
             const snappedX = snapCoordinate(x);
             const snappedY = snapCoordinate(y);
+
+            if (e.button === 1 || e.altKey) {
+                panning = true;
+                startPanX = e.clientX / zoomLevel - panX;
+                startPanY = e.clientY / zoomLevel - panY;
+                return;
+            }
+
+            if (currentTool === 'select') {
+                selectedPoint = getPointAt(x, y);
+                if (selectedPoint) {
+                    selecting = true;
+                }
+                initializeCanvas();
+                return;
+            }
+
+            if (currentTool === 'erase') {
+                erasing = true;
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath();
+                ctx.moveTo(snappedX, snappedY);
+                lastPoint = { x: snappedX, y: snappedY };
+                saveCanvasState('Erase');
+                return;
+            }
+
+            drawing = true;
+            ctx.globalCompositeOperation = 'source-over';
             ctx.beginPath();
             ctx.moveTo(snappedX, snappedY);
-            lastPoint = [snappedX, snappedY];
+            lastPoint = { x: snappedX, y: snappedY };
+            currentPath = [{ x: snappedX, y: snappedY }];
             drawingBounds.minX = Math.min(drawingBounds.minX, snappedX);
             drawingBounds.maxX = Math.max(drawingBounds.maxX, snappedX);
             drawingBounds.minY = Math.min(drawingBounds.minY, snappedY);
             drawingBounds.maxY = Math.max(drawingBounds.maxY, snappedY);
-            saveCanvasState();
+            saveCanvasState('Draw');
         });
 
         canvas.addEventListener('mousemove', (e) => {
-            if (!drawing) return;
             const rect = canvas.getBoundingClientRect();
-            const x = (e.clientX - rect.left) / zoomLevel - panX;
-            const y = (e.clientY - rect.top) / zoomLevel - panY;
-            const snappedX = snapCoordinate(x);
-            const snappedY = snapCoordinate(y);
-            if (lastPoint && (lastPoint[0] !== snappedX || lastPoint[1] !== snappedY)) {
-                ctx.lineTo(snappedX, snappedY);
-                ctx.stroke();
-                lastPoint = [snappedX, snappedY];
+            cursorX = (e.clientX - rect.left) / zoomLevel - panX;
+            cursorY = (e.clientY - rect.top) / zoomLevel - panY;
+            updateStatusBar();
+
+            const snappedX = snapCoordinate(cursorX);
+            const snappedY = snapCoordinate(cursorY);
+
+            if (panning) {
+                panX = e.clientX / zoomLevel - startPanX;
+                panY = e.clientY / zoomLevel - startPanY;
+                updateCanvasTransform();
+                return;
+            }
+
+            if (selecting && selectedPoint) {
+                selectedPoint.x = snappedX;
+                selectedPoint.y = snappedY;
                 drawingBounds.minX = Math.min(drawingBounds.minX, snappedX);
                 drawingBounds.maxX = Math.max(drawingBounds.maxX, snappedX);
                 drawingBounds.minY = Math.min(drawingBounds.minY, snappedY);
                 drawingBounds.maxY = Math.max(drawingBounds.maxY, snappedY);
+                initializeCanvas();
+                return;
+            }
+
+            if (erasing) {
+                ctx.lineTo(snappedX, snappedY);
+                ctx.stroke();
+                lastPoint = { x: snappedX, y: snappedY };
+                return;
+            }
+
+            if (!drawing) return;
+            if (lastPoint && (lastPoint.x !== snappedX || lastPoint.y !== snappedY)) {
+                ctx.lineTo(snappedX, snappedY);
+                ctx.stroke();
+                lastPoint = { x: snappedX, y: snappedY };
+                currentPath.push({ x: snappedX, y: snappedY });
+                drawingBounds.minX = Math.min(drawingBounds.minX, snappedX);
+                drawingBounds.maxX = Math.max(drawingBounds.maxX, snappedX);
+                drawingBounds.minY = Math.min(drawingBounds.minY, snappedY);
+                drawingBounds.maxY = Math.max(drawingBounds.maxY, snappedY);
+
+                const length = calculatePathLength(currentPath);
+                pathLengthDisplay.textContent = `Path Length: ${length}m`;
+                pathLengthDisplay.style.display = 'block';
             }
         });
 
-        canvas.addEventListener('mouseup', () => {
+        canvas.addEventListener('mouseup', (e) => {
+            if (panning) {
+                panning = false;
+                return;
+            }
+
+            if (selecting) {
+                selecting = false;
+                saveCanvasState('Move Point');
+                return;
+            }
+
+            if (erasing) {
+                erasing = false;
+                ctx.globalCompositeOperation = 'source-over';
+                paths = paths.filter(path => path.points.length > 1);
+                saveCanvasState('Erase');
+                return;
+            }
+
             drawing = false;
             ctx.closePath();
+            if (currentPath.length > 1) {
+                paths.push({ color: colorPicker.value, size: brushSize, points: currentPath });
+            }
             lastPoint = null;
+            currentPath = [];
             pathPoints = [];
             showPathPreview = false;
             previewPathBtn.textContent = 'Preview Path';
+            pathLengthDisplay.style.display = 'none';
         });
 
         canvas.addEventListener('mouseout', () => {
             drawing = false;
+            erasing = false;
+            selecting = false;
+            panning = false;
+            ctx.globalCompositeOperation = 'source-over';
             ctx.closePath();
             lastPoint = null;
             pathPoints = [];
             showPathPreview = false;
             previewPathBtn.textContent = 'Preview Path';
+            pathLengthDisplay.style.display = 'none';
+        });
+
+        canvas.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const delta = e.deltaY > 0 ? -0.1 : 0.1;
+            zoomLevel = Math.min(Math.max(zoomLevel + delta, 0.5), 3);
+            updateCanvasTransform();
+            updateStatusBar();
         });
 
         clearBtn.addEventListener('click', () => {
-            initializeCanvas();
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            paths = [];
+            currentPath = [];
             undoStack = [];
             redoStack = [];
+            drawingBounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+            initializeCanvas();
             updateUndoRedoButtons();
+            updateHistoryPanel();
             commandsOutput.innerHTML = '';
             annotatedImage.style.display = 'none';
             annotatedImage.src = '';
-            drawingBounds = { minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity };
+            showToast('Canvas Cleared');
         });
 
-        downloadBtn.addEventListener('click', () => {
+        downloadPngBtn.addEventListener('click', () => {
             const link = document.createElement('a');
             link.download = 'robotmechi_path.png';
             link.href = canvas.toDataURL('image/png');
             link.click();
+            showToast('Downloaded as PNG');
+        });
+
+        downloadSvgBtn.addEventListener('click', () => {
+            const svgContent = getSVGContent();
+            const blob = new Blob([svgContent], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = 'robotmechi_path.svg';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('Downloaded as SVG');
+        });
+
+        saveBtn.addEventListener('click', () => {
+            const project = {
+                paths,
+                backgroundStyle,
+                showGrid,
+                snapToGrid,
+                zoomLevel,
+                panX,
+                panY
+            };
+            const blob = new Blob([JSON.stringify(project)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.download = 'robotmechi_project.json';
+            link.href = url;
+            link.click();
+            URL.revokeObjectURL(url);
+            showToast('Project Saved');
+        });
+
+        loadBtn.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'application/json';
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const project = JSON.parse(event.target.result);
+                    paths = project.paths;
+                    backgroundStyle = project.backgroundStyle;
+                    showGrid = project.showGrid;
+                    snapToGrid = project.snapToGrid;
+                    zoomLevel = project.zoomLevel;
+                    panX = project.panX;
+                    panY = project.panY;
+                    backgroundSelect.value = backgroundStyle;
+                    toggleGridBtn.textContent = showGrid ? 'Hide Grid' : 'Show Grid';
+                    snapToGridBtn.textContent = snapToGrid ? 'Disable Snap to Grid' : 'Enable Snap to Grid';
+                    updateCanvasTransform();
+                    initializeCanvas();
+                    saveCanvasState('Load Project');
+                    showToast('Project Loaded');
+                };
+                reader.readAsText(file);
+            };
+            input.click();
         });
 
         submitBtn.addEventListener('click', async () => {
@@ -557,30 +1460,120 @@
                             submitBtn.disabled = false;
 
                             if (response.ok) {
-                                commandsOutput.innerHTML = '<h3 class="font-bold text-gray-800 mb-2">Generated Commands:</h3>' +
-                                    '<ul class="list-disc pl-5">' + 
-                                    result.commands.map(cmd => `<li class="text-gray-700">${cmd}</li>`).join('') + 
-                                    '</ul>';
+                                commandsOutput.innerHTML = '<h3 class="font-bold text-gray-800 dark:text-gray-100 mb-2">Generated Commands:</h3>' +
+                                    '<ul class="list-disc pl-5">' +
+                                    result.commands.map(cmd => `<li class="text-gray-700 dark:text-gray-300">${cmd}</li>`).join('') +
+                                    '</ul>' +
+                                    `<p class="text-gray-700 dark:text-gray-300 mt-2">${result.final_orientation}</p>`;
 
                                 annotatedImage.src = `http://localhost:8000/images/${result.annotated_image.split('/').pop()}`;
                                 annotatedImage.style.display = 'block';
+                                showToast('Commands Generated');
                             } else {
                                 commandsOutput.innerHTML = `<p class="text-red-500">Error: ${result.detail}</p>`;
                                 annotatedImage.style.display = 'none';
+                                showToast('Error Generating Commands');
                             }
                         } catch (error) {
                             loadingSpinner.style.display = 'none';
                             submitBtn.disabled = false;
                             commandsOutput.innerHTML = `<p class="text-red-500">Error: Failed to connect to the server</p>`;
                             annotatedImage.style.display = 'none';
+                            showToast('Server Connection Failed');
                         }
                     }, 'image/png');
                 };
             }, 'image/png');
         });
 
+        themeToggleBtn.addEventListener('click', () => {
+            document.body.classList.toggle('dark');
+            themeToggleBtn.innerHTML = document.body.classList.contains('dark') ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+            localStorage.setItem('theme', document.body.classList.contains('dark') ? 'dark' : 'light');
+            showToast(document.body.classList.contains('dark') ? 'Dark Mode Enabled' : 'Light Mode Enabled');
+        });
+
+        toggleSidebarBtn.addEventListener('click', () => {
+            document.querySelector('.sidebar').classList.toggle('sidebar-hidden');
+        });
+
+        drawToolBtn.addEventListener('click', () => {
+            currentTool = 'draw';
+            drawToolBtn.classList.add('active');
+            eraseToolBtn.classList.remove('active');
+            selectToolBtn.classList.remove('active');
+        });
+
+        eraseToolBtn.addEventListener('click', () => {
+            currentTool = 'erase';
+            drawToolBtn.classList.remove('active');
+            eraseToolBtn.classList.add('active');
+            selectToolBtn.classList.remove('active');
+        });
+
+        selectToolBtn.addEventListener('click', () => {
+            currentTool = 'select';
+            drawToolBtn.classList.remove('active');
+            eraseToolBtn.classList.remove('active');
+            selectToolBtn.classList.add('active');
+        });
+
+        // Keyboard Shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.ctrlKey && e.key === '+') {
+                e.preventDefault();
+                zoomInBtn.click();
+            }
+            if (e.ctrlKey && e.key === '-') {
+                e.preventDefault();
+                zoomOutBtn.click();
+            }
+            if (e.ctrlKey && e.key === '0') {
+                e.preventDefault();
+                zoomResetBtn.click();
+            }
+            if (e.key === 'g') toggleGridBtn.click();
+            if (e.key === 's') snapToGridBtn.click();
+            if (e.ctrlKey && e.key === 'z') undoBtn.click();
+            if (e.ctrlKey && e.key === 'y') redoBtn.click();
+            if (e.key === 'h') historyBtn.click();
+            if (e.key === 'p') previewPathBtn.click();
+            if (e.shiftKey && e.key === 'P') pathStatsBtn.click();
+            if (e.key === 'c') clearBtn.click();
+            if (e.key === 'd') downloadPngBtn.click();
+            if (e.shiftKey && e.key === 'D') downloadSvgBtn.click();
+            if (e.key === 'Enter') submitBtn.click();
+            if (e.key === 't') themeToggleBtn.click();
+            if (e.shiftKey && e.key === 'S') toggleSidebarBtn.click();
+            if (e.key === '1') drawToolBtn.click();
+            if (e.key === '2') eraseToolBtn.click();
+            if (e.key === '3') selectToolBtn.click();
+            if (e.ctrlKey && e.key === 's') {
+                e.preventDefault();
+                saveBtn.click();
+            }
+            if (e.ctrlKey && e.key === 'l') {
+                e.preventDefault();
+                loadBtn.click();
+            }
+            if (e.key === ' ' && showPathPreview) {
+                e.preventDefault();
+                pauseResumeBtn.click();
+            }
+            if (e.key === 'r' && showPathPreview) {
+                replayBtn.click();
+            }
+        });
+
+        // Load theme preference
+        if (localStorage.getItem('theme') === 'dark') {
+            document.body.classList.add('dark');
+            themeToggleBtn.innerHTML = '<i class="fas fa-moon"></i>';
+        }
+
         resizeCanvas();
         window.addEventListener('resize', resizeCanvas);
+        updateStatusBar();
     </script>
 </body>
 </html>
